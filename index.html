@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>直播ID转视频ID查询工具</title>
+    <!-- 引入Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Font Awesome图标 -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css"
+      rel="stylesheet"
+    />
+    <!-- 配置Tailwind自定义主题 -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#4F46E5", // 主色调：靛蓝色（科技感、专业）
+              secondary: "#10B981", // 辅助色：绿色（成功状态）
+              neutral: {
+                50: "#F9FAFB",
+                100: "#F3F4F6",
+                200: "#E5E7EB",
+                700: "#374151",
+                800: "#1F2937",
+                900: "#111827",
+              },
+            },
+            fontFamily: {
+              inter: ["Inter", "system-ui", "sans-serif"],
+            },
+            boxShadow: {
+              card: "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03)",
+              "card-hover":
+                "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+            },
+          },
+        },
+      };
+    </script>
+    <!-- 自定义工具类 -->
+    <style type="text/tailwindcss">
+      @layer utilities {
+        .content-auto {
+          content-visibility: auto;
+        }
+        .text-shadow {
+          text-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        .bg-gradient-primary {
+          background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+        }
+        .transition-all-300 {
+          transition: all 0.3s ease;
+        }
+      }
+    </style>
+    <style>
+      /* 基础动画定义 */
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+      .animate-fade-in {
+        animation: fadeIn 0.4s ease forwards;
+      }
+      .animate-pulse-slow {
+        animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+      /* 滚动条美化 */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #a1a1a1;
+      }
+      /* 固定页脚布局 */
+      html,
+      body {
+        height: 100%;
+      }
+      .app-container {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .main-content-wrapper {
+        flex: 1;
+        overflow-y: auto;
+      }
+      .fixed-footer {
+        flex-shrink: 0;
+      }
+    </style>
+  </head>
+  <body class="font-inter bg-neutral-50 text-neutral-800">
+    <div class="app-container">
+      <!-- 顶部导航 -->
+      <header class="bg-white shadow-sm sticky top-0 z-50">
+        <div
+          class="container mx-auto px-4 py-4 flex justify-between items-center"
+        >
+          <div class="flex items-center space-x-2">
+            <i class="fa fa-video-camera text-primary text-2xl"></i>
+            <h1 class="text-xl md:text-2xl font-bold text-neutral-800">
+              直播ID <span class="text-primary">转</span> 视频ID查询工具
+            </h1>
+          </div>
+          <div class="text-sm text-neutral-700">
+            <i class="fa fa-lock mr-1"></i> AES-CBC加密传输
+          </div>
+        </div>
+      </header>
+
+      <!-- 主内容区 - 可滚动 -->
+      <div class="main-content-wrapper">
+        <main class="container mx-auto px-4 py-8 md:py-12">
+          <div class="max-w-6xl mx-auto">
+            <!-- 主要内容区域 - 根据设备类型自动调整布局 -->
+            <div id="mainContentArea" class="flex flex-col lg:flex-row gap-8">
+              <!-- 输入区域 -->
+              <div id="inputSection" class="w-full lg:w-1/2 flex flex-col">
+                <div
+                  class="bg-white rounded-2xl shadow-card p-6 md:p-8 transition-all-300 hover:shadow-card-hover flex flex-col flex-grow"
+                >
+                  <div class="mb-6">
+                    <h2
+                      class="text-xl md:text-2xl font-bold text-neutral-900 mb-2"
+                    >
+                      输入直播ID
+                    </h2>
+                    <p class="text-neutral-700">
+                      支持多个ID，用逗号、空格或换行分隔（例如：12345, 67890
+                      或每行一个ID）
+                    </p>
+                  </div>
+
+                  <!-- 输入框 -->
+                  <div class="mb-6 flex-grow flex flex-col">
+                    <label
+                      for="liveIds"
+                      class="block text-sm font-medium text-neutral-700 mb-2"
+                      >直播ID列表</label
+                    >
+                    <textarea
+                      id="liveIds"
+                      class="w-full flex-grow min-h-[120px] p-4 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all-300 resize-none"
+                      placeholder="请输入直播ID，多个ID用逗号、空格或换行分隔&#10;示例：&#10;12139857&#10;10780175&#10;123456"
+                    ></textarea>
+                  </div>
+
+                  <!-- 按钮 -->
+                  <button
+                    id="queryBtn"
+                    class="w-full bg-gradient-primary text-white font-medium py-3 px-6 rounded-lg shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all-300 flex items-center justify-center space-x-2"
+                  >
+                    <i class="fa fa-search"></i>
+                    <span>开始查询</span>
+                  </button>
+
+                  <!-- 加载状态（默认隐藏） -->
+                  <div
+                    id="loading"
+                    class="w-full bg-neutral-100 text-neutral-700 font-medium py-3 px-6 rounded-lg flex items-center justify-center space-x-2 hidden"
+                  >
+                    <i class="fa fa-spinner fa-spin"></i>
+                    <span>查询中...</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 结果区域（默认隐藏） -->
+              <div id="resultSection" class="w-full lg:w-1/2 hidden">
+                <div
+                  id="resultContainer"
+                  class="bg-white rounded-2xl shadow-card p-6 md:p-8 animate-fade-in h-full"
+                >
+                  <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl md:text-2xl font-bold text-neutral-900">
+                      查询结果
+                    </h2>
+                    <div class="flex items-center space-x-3">
+                      <!-- 一键复制所有视频ID按钮（默认隐藏） -->
+                      <button
+                        id="copyAllBtn"
+                        class="hidden text-primary hover:text-primary/80 transition-all-300 flex items-center space-x-1 text-sm font-medium"
+                        title="复制所有视频ID"
+                      >
+                        <i class="fa fa-copy"></i>
+                        <span>复制全部</span>
+                      </button>
+                      <!-- 导出CSV按钮（默认隐藏） -->
+                      <button
+                        id="exportCsvBtn"
+                        class="hidden text-primary hover:text-primary/80 transition-all-300 flex items-center space-x-1 text-sm font-medium"
+                        title="导出CSV文件"
+                      >
+                        <i class="fa fa-download"></i>
+                        <span>导出CSV</span>
+                      </button>
+                      <span
+                        id="resultCount"
+                        class="bg-primary/10 text-primary text-sm font-medium px-3 py-1 rounded-full"
+                      ></span>
+                    </div>
+                  </div>
+
+                  <!-- 结果列表 -->
+                  <div
+                    id="resultList"
+                    class="max-h-[calc(100vh-300px)] overflow-y-auto pr-2"
+                  >
+                    <!-- 结果将动态插入这里 -->
+                  </div>
+
+                  <!-- 错误提示（默认隐藏） -->
+                  <div
+                    id="errorMsg"
+                    class="hidden bg-red-50 text-red-600 p-4 rounded-lg mt-4"
+                  >
+                    <i class="fa fa-exclamation-circle mr-2"></i>
+                    <span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <!-- 固定页脚 -->
+      <footer class="fixed-footer bg-neutral-900 text-neutral-200 py-8">
+        <div class="container mx-auto px-4 text-center text-sm">
+          <p>© 2025 直播ID转视频ID查询工具 | 数据加密传输，保障信息安全</p>
+          <p class="mt-2 text-neutral-400">
+            加密方式：AES-CBC-128 + PKCS7Padding + Base64编码
+          </p>
+        </div>
+      </footer>
+    </div>
+
+    <!-- AES加密核心库 + 工具函数 -->
+    <script>
+      // AES加密配置
+      const AES_CONFIG = {
+        key: "aom89g6mn05lz5b4", // 密码
+        iv: "563216db1e1744c7", // 偏移量
+        mode: "CBC", // 加密模式
+        padding: "pkcs7padding", // 填充方式
+        blockSize: 128, // 数据块大小
+      };
+
+      // Base64工具类
+      const Base64 = {
+        encode: function (u8arr) {
+          return btoa(String.fromCharCode.apply(null, u8arr));
+        },
+        decode: function (str) {
+          return new Uint8Array(
+            atob(str)
+              .split("")
+              .map((c) => c.charCodeAt(0))
+          );
+        },
+      };
+
+      // AES-CBC-PKCS7加密实现
+      class AES {
+        constructor(key, iv) {
+          this.key = this._toUint8Array(key);
+          this.iv = this._toUint8Array(iv);
+        }
+
+        // 字符串转Uint8Array
+        _toUint8Array(str) {
+          return new TextEncoder().encode(str);
+        }
+
+        // PKCS7填充
+        _pkcs7Pad(data) {
+          const blockSize = 16; // 128位 = 16字节
+          const paddingLen = blockSize - (data.length % blockSize);
+          const padding = new Uint8Array(paddingLen).fill(paddingLen);
+          return new Uint8Array([...data, ...padding]);
+        }
+
+        encrypt(text) {
+          // 1. 字符串转Uint8Array
+          const data = this._toUint8Array(text);
+          // 2. PKCS7填充
+          const paddedData = this._pkcs7Pad(data);
+          // 3. 先异步导入密钥（关键：加await）
+          return crypto.subtle
+            .importKey("raw", this.key, { name: "AES-CBC" }, false, ["encrypt"])
+            .then((cryptoKey) => {
+              // 拿到CryptoKey后
+              // 4. 再执行加密
+              return crypto.subtle.encrypt(
+                { name: "AES-CBC", iv: this.iv },
+                cryptoKey, // 这里传入的是已解析的CryptoKey
+                paddedData
+              );
+            })
+            .then((encrypted) => {
+              // 5. 加密结果转Base64
+              return Base64.encode(new Uint8Array(encrypted));
+            });
+        }
+      }
+
+      // 安全的剪贴板复制函数（支持降级方案）
+      function copyToClipboard(text) {
+        // 方案1：尝试使用现代剪贴板API（需要HTTPS和用户交互）
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard
+            .writeText(text)
+            .then(() => {
+              showToast("success", "已复制到剪贴板");
+            })
+            .catch((err) => {
+              console.warn("剪贴板API失败，使用降级方案:", err);
+              fallbackCopyTextToClipboard(text);
+            });
+        } else {
+          // 方案2：使用传统的execCommand方法（兼容性更好）
+          fallbackCopyTextToClipboard(text);
+        }
+      }
+
+      // 降级复制方案
+      function fallbackCopyTextToClipboard(text) {
+        try {
+          // 创建临时textarea元素
+          const textArea = document.createElement("textarea");
+          textArea.value = text;
+
+          // 设置样式使其不可见
+          textArea.style.position = "fixed";
+          textArea.style.left = "-999999px";
+          textArea.style.top = "-999999px";
+          textArea.style.opacity = "0";
+          textArea.style.pointerEvents = "none";
+          textArea.style.tabIndex = "-1";
+          textArea.setAttribute("readonly", "");
+
+          // 添加到DOM
+          document.body.appendChild(textArea);
+
+          // 选择文本
+          textArea.focus();
+          textArea.select();
+
+          // 执行复制命令
+          const successful = document.execCommand("copy");
+
+          // 清理
+          document.body.removeChild(textArea);
+
+          if (successful) {
+            showToast("success", "已复制到剪贴板");
+          } else {
+            showToast("error", "复制失败，请手动选择复制");
+          }
+        } catch (err) {
+          console.error("复制失败:", err);
+          showToast("error", "复制失败，请手动选择复制");
+        }
+      }
+
+      // 导出CSV功能
+      function exportToCSV(data) {
+        try {
+          // 准备CSV数据
+          const headers = ["直播ID", "视频ID"];
+          const csvRows = [];
+
+          // 添加表头
+          csvRows.push(headers.join(","));
+
+          // 添加数据行
+          Object.keys(data).forEach((liveId) => {
+            const videoId = data[liveId];
+            if (videoId) {
+              // 只导出有效的视频ID
+              csvRows.push(`${liveId},${videoId}`);
+            }
+          });
+
+          // 生成CSV内容
+          const csvContent = csvRows.join("\n");
+
+          // 创建Blob对象
+          const blob = new Blob(["\ufeff" + csvContent], {
+            type: "text/csv;charset=utf-8;",
+          });
+
+          // 创建下载链接
+          const link = document.createElement("a");
+          const url = URL.createObjectURL(blob);
+
+          // 设置下载属性
+          link.setAttribute("href", url);
+          link.setAttribute(
+            "download",
+            `直播ID转视频ID_${new Date().toISOString().split("T")[0]}.csv`
+          );
+          link.style.visibility = "hidden";
+
+          // 添加到DOM并触发下载
+          document.body.appendChild(link);
+          link.click();
+
+          // 清理
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+
+          showToast("success", "CSV文件已导出");
+        } catch (error) {
+          console.error("导出CSV失败:", error);
+          showToast("error", "导出失败，请重试");
+        }
+      }
+
+      // 显示提示消息
+      function showToast(type, message) {
+        const toast = document.createElement("div");
+        const icon = type === "success" ? "check" : "exclamation-circle";
+        const bgColor = type === "success" ? "bg-green-600" : "bg-red-600";
+
+        toast.className = `fixed bottom-4 right-4 ${bgColor} text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in`;
+        toast.innerHTML = `<i class="fa fa-${icon} mr-2"></i> ${message}`;
+
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+          toast.style.opacity = "0";
+          toast.style.transform = "translateY(10px)";
+          setTimeout(() => {
+            if (document.body.contains(toast)) {
+              document.body.removeChild(toast);
+            }
+          }, 300);
+        }, 2000);
+      }
+
+      // 复制所有视频ID函数
+      function copyAllVideoIds(data) {
+        try {
+          // 提取所有有效的视频ID，一行一个
+          const videoIds = Object.keys(data)
+            .filter((liveId) => data[liveId]) // 只取有效的视频ID
+            .map((liveId) => data[liveId])
+            .join("\n");
+
+          if (videoIds) {
+            copyToClipboard(videoIds);
+          } else {
+            showToast("info", "没有有效的视频ID可复制");
+          }
+        } catch (error) {
+          console.error("复制所有视频ID失败:", error);
+          showToast("error", "复制失败，请重试");
+        }
+      }
+
+      // 页面逻辑
+      document.addEventListener("DOMContentLoaded", () => {
+        const liveIdsEl = document.getElementById("liveIds");
+        const queryBtnEl = document.getElementById("queryBtn");
+        const loadingEl = document.getElementById("loading");
+        const resultContainerEl = document.getElementById("resultContainer");
+        const resultSectionEl = document.getElementById("resultSection");
+        const resultListEl = document.getElementById("resultList");
+        const resultCountEl = document.getElementById("resultCount");
+        const errorMsgEl = document.getElementById("errorMsg");
+        const exportCsvBtn = document.getElementById("exportCsvBtn");
+        const copyAllBtn = document.getElementById("copyAllBtn");
+
+        // 存储当前查询结果数据
+        let currentQueryData = null;
+
+        // 初始化AES加密实例
+        const aes = new AES(AES_CONFIG.key, AES_CONFIG.iv);
+
+        // 查询按钮点击事件
+        queryBtnEl.addEventListener("click", async () => {
+          try {
+            // 1. 清空之前的结果和错误信息
+            resultListEl.innerHTML = "";
+            errorMsgEl.classList.add("hidden");
+            errorMsgEl.querySelector("span").textContent = "";
+            exportCsvBtn.classList.add("hidden"); // 隐藏导出按钮
+            copyAllBtn.classList.add("hidden"); // 隐藏一键复制按钮
+            currentQueryData = null;
+
+            // 2. 获取并处理输入的直播ID
+            const input = liveIdsEl.value.trim();
+            if (!input) {
+              showError("请输入至少一个直播ID");
+              return;
+            }
+
+            // 处理多种分隔符（逗号、空格、换行）
+            let liveIds = input
+              .replace(/[\s,，、;\n\r]+/g, ",") // 替换所有分隔符为逗号
+              .split(",")
+              .filter((id) => id && /^\d+$/.test(id)) // 过滤空值和非数字ID
+              .map((id) => id.trim());
+
+            // 去重处理
+            const uniqueLiveIds = [...new Set(liveIds)];
+            const duplicateCount = liveIds.length - uniqueLiveIds.length;
+
+            // 如果有重复ID，提示用户
+            if (duplicateCount > 0) {
+              showToast("info", `已自动去除 ${duplicateCount} 个重复的直播ID`);
+              liveIds = uniqueLiveIds;
+            }
+
+            if (liveIds.length === 0) {
+              showError("未检测到有效的直播ID，请输入数字格式的ID");
+              return;
+            }
+
+            // 3. 显示加载状态，隐藏按钮
+            queryBtnEl.classList.add("hidden");
+            loadingEl.classList.remove("hidden");
+
+            // 4. 构建原始参数（liveCourseIds=1,2,3）
+            const rawParam = `liveCourseIds=${liveIds.join(",")}`;
+
+            // 5. AES加密参数
+            const encryptedParam = await aes.encrypt(rawParam);
+
+            // 6. 构建请求URL
+            const apiUrl = `https://zhs-livecourse-gateway.zhihuishu.com/admin/shareCourse/openApi/getVideos?t=${encodeURIComponent(
+              encryptedParam
+            )}`;
+
+            // 7. 发送请求
+            const response = await fetch(apiUrl, {
+              method: "POST",
+              headers: {
+                Accept: "application/json",
+                "X-Requested-With": "XMLHttpRequest",
+              },
+            });
+
+            const result = await response.json();
+
+            // 8. 处理响应结果
+            if (result.code === 200 && result.data) {
+              currentQueryData = result.data; // 保存查询结果
+              showResult(liveIds, result.data);
+            } else {
+              showError(result.msg || "查询失败，请稍后重试");
+            }
+          } catch (error) {
+            console.error("查询异常:", error);
+            showError("网络异常或接口请求失败，请检查网络连接或联系管理员");
+          } finally {
+            // 恢复按钮状态，隐藏加载
+            queryBtnEl.classList.remove("hidden");
+            loadingEl.classList.add("hidden");
+          }
+        });
+
+        // 导出CSV按钮点击事件
+        exportCsvBtn.addEventListener("click", () => {
+          if (currentQueryData) {
+            exportToCSV(currentQueryData);
+          }
+        });
+
+        // 一键复制所有视频ID按钮点击事件
+        copyAllBtn.addEventListener("click", () => {
+          if (currentQueryData) {
+            copyAllVideoIds(currentQueryData);
+          }
+        });
+
+        // 显示错误信息
+        function showError(message) {
+          resultSectionEl.classList.remove("hidden");
+          resultContainerEl.classList.remove("hidden");
+          errorMsgEl.classList.remove("hidden");
+          errorMsgEl.querySelector("span").textContent = message;
+          exportCsvBtn.classList.add("hidden"); // 错误时隐藏导出按钮
+          copyAllBtn.classList.add("hidden"); // 错误时隐藏一键复制按钮
+        }
+
+        // 显示查询结果
+        function showResult(liveIds, data) {
+          resultSectionEl.classList.remove("hidden");
+          resultContainerEl.classList.remove("hidden");
+
+          // 计算有效结果数量
+          const validResultsCount = Object.keys(data).filter(
+            (liveId) => data[liveId]
+          ).length;
+          resultCountEl.textContent = `共 ${validResultsCount} 条结果`;
+
+          // 显示或隐藏导出按钮和一键复制按钮（只有有有效结果时才显示）
+          if (validResultsCount > 0) {
+            exportCsvBtn.classList.remove("hidden");
+            copyAllBtn.classList.remove("hidden");
+          } else {
+            exportCsvBtn.classList.add("hidden");
+            copyAllBtn.classList.add("hidden");
+          }
+
+          // 构建结果列表
+          let html = "";
+
+          // 遍历所有输入的直播ID，匹配对应的视频ID
+          liveIds.forEach((liveId) => {
+            const videoId = data[liveId] || "无对应视频ID";
+            const statusClass = data[liveId]
+              ? "text-secondary"
+              : "text-neutral-400";
+            const iconClass = data[liveId]
+              ? "fa-check-circle"
+              : "fa-exclamation-circle";
+
+            html += `
+                    <div class="flex flex-col md:flex-row md:items-center justify-between p-4 border-b border-neutral-100 last:border-0 hover:bg-neutral-50 rounded-lg transition-all-300">
+                        <div class="flex items-center mb-2 md:mb-0">
+                            <i class="fa ${iconClass} ${statusClass} mr-3"></i>
+                            <div>
+                                <p class="text-sm text-neutral-500">直播ID</p>
+                                <p class="font-medium text-neutral-800">${liveId}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="text-right">
+                                <p class="text-sm text-neutral-500">视频ID</p>
+                                <p class="font-medium ${statusClass}">${videoId}</p>
+                            </div>
+                            ${
+                              data[liveId]
+                                ? `
+                            <button class="ml-4 text-primary hover:text-primary/80 transition-all-300 copy-btn"
+                                data-video-id="${videoId}"
+                                title="复制视频ID">
+                                <i class="fa fa-copy"></i>
+                            </button>
+                            `
+                                : ""
+                            }
+                        </div>
+                    </div>
+                    `;
+          });
+
+          resultListEl.innerHTML = html;
+
+          // 添加复制按钮事件监听器（在用户交互中执行）
+          attachCopyEventListeners();
+        }
+
+        // 为复制按钮添加事件监听器
+        function attachCopyEventListeners() {
+          const copyButtons = document.querySelectorAll(".copy-btn");
+          copyButtons.forEach((btn) => {
+            btn.addEventListener("click", function () {
+              const videoId = this.getAttribute("data-video-id");
+              copyToClipboard(videoId);
+            });
+          });
+        }
+
+        // 防止页面卸载时的提示
+        window.addEventListener("beforeunload", function (e) {
+          if (liveIdsEl.value.trim()) {
+            e.preventDefault();
+            e.returnValue = "您有未提交的输入，确定要离开吗？";
+            return e.returnValue;
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
