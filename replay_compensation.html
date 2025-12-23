@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>回放补偿 SQL 生成工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css"
+    />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#5252E2",
+              secondary: "#7C7CFF",
+              dark: "#0F0F2D",
+              darker: "#0A0A1F",
+              light: "#F0F0FF",
+              success: "#4CAF50",
+              error: "#F44336",
+              panel: "#1A1A3A",
+              panelDark: "#151530",
+            },
+            fontFamily: {
+              sans: ["Inter", "system-ui", "sans-serif"],
+              mono: ["Fira Code", "monospace"],
+            },
+            animation: {
+              "fade-in": "fadeIn 0.5s ease-in-out",
+              "slide-in": "slideIn 0.3s ease-out",
+              "pulse-subtle": "pulseSubtle 2s infinite",
+            },
+            keyframes: {
+              fadeIn: {
+                "0%": { opacity: "0" },
+                "100%": { opacity: "1" },
+              },
+              slideIn: {
+                "0%": { transform: "translateY(10px)", opacity: "0" },
+                "100%": { transform: "translateY(0)", opacity: "1" },
+              },
+              pulseSubtle: {
+                "0%, 100%": { opacity: "1" },
+                "50%": { opacity: "0.8" },
+              },
+            },
+          },
+        },
+      };
+    </script>
+    <style type="text/tailwindcss">
+      @layer utilities {
+        .glass-effect {
+          @apply bg-panel border border-white/10 shadow-lg rounded-lg;
+        }
+        .input-focus {
+          @apply focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300;
+        }
+        .btn-hover {
+          @apply hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300;
+        }
+        .sql-container {
+          @apply relative rounded-lg overflow-hidden;
+        }
+        .sql-header {
+          @apply flex justify-between items-center px-4 py-2 bg-primary/90 text-white font-medium;
+        }
+        .sql-content {
+          @apply p-4 bg-gray-900 rounded-b-lg overflow-x-auto;
+        }
+        .copy-btn {
+          @apply p-1.5 rounded-md hover:bg-white/20 transition-colors duration-200;
+        }
+        .copy-success {
+          @apply bg-success/20 text-success border-success;
+        }
+        .fixed-footer {
+          @apply fixed bottom-0 left-0 right-0 z-50;
+        }
+        .panel-header {
+          @apply flex items-center px-4 py-3 bg-panelDark rounded-t-lg border-b border-white/10 font-medium text-white;
+        }
+        .panel-icon {
+          @apply text-primary;
+          margin-right: 10px;
+          margin-top: 2px;
+        }
+        .template-input {
+          @apply w-full px-3 py-2 bg-panelDark border border-gray-700 rounded-lg input-focus text-white font-mono resize-none;
+          word-wrap: break-word;
+          word-break: break-all;
+          overflow: auto;
+        }
+        .main-container {
+          @apply w-full max-w-[1400px] mx-auto;
+        }
+        .count-badge {
+          @apply text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary;
+        }
+        .header {
+          margin-top: 10px;
+          margin-left: 15px;
+          margin-bottom: 10px;
+        }
+      }
+    </style>
+  </head>
+  <body
+    class="bg-gradient-to-br from-dark to-darker min-h-screen text-light m-0 p-0 overflow-hidden"
+  >
+    <div class="w-full h-screen flex flex-col">
+      <!-- 页头 -->
+      <header class="mb-8 animate-fade-in header">
+        <div class="flex items-center">
+          <div class="bg-primary/20 p-1 rounded-md mr-4">
+            <i class="fa fa-database text-primary text-2xl"></i>
+          </div>
+          <h1 class="text-xl md:text-2xl font-bold text-neutral-800 text-white">
+            回放补偿 <span class="text-primary">SQL</span> 生成工具
+          </h1>
+        </div>
+      </header>
+
+      <!-- 主要内容区 -->
+      <div class="flex-grow p-4 overflow-auto pb-20">
+        <div class="min-h-full grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <!-- 左侧输入区 -->
+          <div
+            class="glass-effect rounded-r-none p-0 h-full"
+            style="animation-delay: 0.1s"
+          >
+            <div class="panel-header">
+              <i class="fa fa-edit panel-icon"></i>
+              <span>输入参数</span>
+            </div>
+            <div class="p-4 space-y-4">
+              <!-- MSC ID 输入框 -->
+              <div>
+                <div class="flex justify-between items-center mb-1.5">
+                  <label class="block text-sm font-medium mb-1.5 text-gray-300">
+                    MSC ID <span class="text-primary">*</span>
+                  </label>
+
+                  <span id="mscCountBadge" class="count-badge">0 条</span>
+                </div>
+                <textarea
+                  id="mscIds"
+                  rows="5"
+                  placeholder="请输入mscId，多个mscId用换行符分隔"
+                  class="template-input"
+                ></textarea>
+              </div>
+
+              <!-- 时间SQL模板 -->
+              <div>
+                <label class="block text-sm font-medium mb-1.5 text-gray-300">
+                  SQL模板一
+                </label>
+                <textarea id="timeSqlTemplate" rows="4" class="template-input">
+UPDATE tbl_live set actual_start_time = start_time, actual_end_time = end_time WHERE id = (SELECT live_id FROM tbl_live_extend WHERE msc_id = '${mscId}');</textarea
+                >
+              </div>
+
+              <!-- 容器SQL模板 -->
+              <div>
+                <label class="block text-sm font-medium mb-1.5 text-gray-300">
+                  SQL模板二
+                </label>
+                <textarea
+                  id="containerSqlTemplate"
+                  rows="6"
+                  class="template-input"
+                >
+UPDATE tbl_live l JOIN tbl_live_extend le ON le.live_id = l.id JOIN tbl_container c ON c.classroom_code = l.classroom_code AND date_format(c.create_time, '%Y-%m-%d') = date_format(l.start_time, '%Y-%m-%d') SET l.container_id = c.socket_room, l.socket_room = c.socket_room WHERE le.msc_id = '${mscId}';</textarea
+                >
+              </div>
+
+              <!-- 直播ID SQL模板 -->
+              <div>
+                <label class="block text-sm font-medium mb-1.5 text-gray-300">
+                  SQL模板三
+                </label>
+                <textarea
+                  id="liveIdSqlTemplate"
+                  rows="2"
+                  class="template-input"
+                >
+SELECT live_id FROM tbl_live_extend WHERE msc_id IN (${mscId});</textarea
+                >
+              </div>
+
+              <!-- 生成按钮 -->
+              <button
+                id="generateBtn"
+                class="w-full bg-primary hover:bg-secondary text-white py-3 px-6 rounded-lg font-medium btn-hover flex items-center justify-center"
+              >
+                <i class="fa fa-magic mr-2"></i>
+                生成SQL
+              </button>
+            </div>
+          </div>
+
+          <!-- 中间SQL结果区 -->
+          <div
+            class="glass-effect rounded-l-none rounded-r-none p-0 h-full"
+            style="animation-delay: 0.2s; border-l: none; border-r: none"
+          >
+            <div class="panel-header">
+              <i class="fa fa-code panel-icon"></i>
+              <span>SQL 结果</span>
+            </div>
+            <div
+              id="sqlResults"
+              class="p-4 space-y-4 max-h-[calc(100vh-180px)] overflow-y-auto"
+            >
+              <!-- SQL结果将在这里动态生成 -->
+              <div class="text-center text-gray-500 py-12">
+                <i class="fa fa-info-circle text-4xl mb-3"></i>
+                <p>请输入MSC ID并点击"生成SQL"按钮</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右侧接口调用区 -->
+          <div
+            class="glass-effect rounded-l-none p-0 h-full"
+            style="animation-delay: 0.3s"
+          >
+            <div class="panel-header">
+              <i class="fa fa-plug panel-icon"></i>
+              <span>接口调用</span>
+            </div>
+            <div class="p-4 space-y-4">
+              <!-- 多行直播ID输入框 -->
+              <div>
+                <div class="flex justify-between items-center mb-1.5">
+                  <label class="block text-sm font-medium mb-1.5 text-gray-300">
+                    直播ID（多行）
+                  </label>
+                  <span id="liveIdCountBadge" class="count-badge">0 条</span>
+                </div>
+                <textarea
+                  id="liveIdsMulti"
+                  rows="2"
+                  placeholder="直播ID，一个ID占一行"
+                  class="template-input"
+                ></textarea>
+              </div>
+
+              <!-- 单行逗号分隔直播ID输入框 -->
+              <div>
+                <label class="block text-sm font-medium mb-1.5 text-gray-300">
+                  直播ID（逗号分隔）
+                </label>
+                <input
+                  type="text"
+                  id="liveIdsSingle"
+                  placeholder="自动生成的逗号分隔直播ID"
+                  class="template-input"
+                  readonly
+                />
+              </div>
+
+              <!-- Secret输入框 -->
+              <div>
+                <label class="block text-sm font-medium mb-1.5 text-gray-300">
+                  Secret
+                </label>
+                <input
+                  type="text"
+                  id="secret"
+                  value="60761118"
+                  class="template-input"
+                />
+              </div>
+
+              <!-- 接口URL -->
+              <div>
+                <label class="block text-sm font-medium mb-1.5 text-gray-300">
+                  接口URL
+                </label>
+                <textarea rows="2" id="apiUrl" class="template-input">
+http://zhs-simple-class.zhihuishu.com/simple-class/ai-tool/batchGenerateVideo</textarea
+                >
+              </div>
+
+              <!-- 调用按钮 -->
+              <button
+                id="callApiBtn"
+                class="w-full bg-primary hover:bg-secondary text-white py-3 px-6 rounded-lg font-medium btn-hover flex items-center justify-center"
+              >
+                <i class="fa fa-play-circle mr-2"></i>
+                发起生成回放
+              </button>
+
+              <!-- 接口响应区 -->
+              <div class="mt-6">
+                <h3 class="text-sm font-medium mb-2 text-gray-300">接口响应</h3>
+                <div id="apiResponse" class="template-input h-60" readonly>
+                  <div class="text-gray-500">等待接口调用...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 固定页脚 -->
+    <footer
+      class="bg-dark border-t border-white/10 py-2 text-center text-xs text-neutral-400 h-14 flex items-center justify-center fixed bottom-0 left-0 right-0 z-50"
+    >
+      <p>© 2025 回放补偿SQL语句生成工具 | 当前版本：V1.0.0</p>
+    </footer>
+
+    <script>
+      // SQL高亮功能已移除
+
+      // 模板高亮功能已移除
+
+      // 初始化语法高亮
+      hljs.highlightAll();
+
+      // DOM元素
+      const mscIdsInput = document.getElementById("mscIds");
+      const timeSqlTemplate = document.getElementById("timeSqlTemplate");
+      const containerSqlTemplate = document.getElementById(
+        "containerSqlTemplate"
+      );
+      const liveIdSqlTemplate = document.getElementById("liveIdSqlTemplate");
+      const generateBtn = document.getElementById("generateBtn");
+      const sqlResults = document.getElementById("sqlResults");
+      const liveIdsInput = document.getElementById("liveIds");
+      const callApiBtn = document.getElementById("callApiBtn");
+      const apiResponse = document.getElementById("apiResponse");
+      const mscCountBadge = document.getElementById("mscCountBadge");
+      const liveIdCountBadge = document.getElementById("liveIdCountBadge");
+      const apiUrlInput = document.getElementById("apiUrl");
+
+      // 生成SQL
+      generateBtn.addEventListener("click", () => {
+        const mscIds = mscIdsInput.value
+          .trim()
+          .split("\n")
+          .filter((id) => id.trim());
+
+        if (mscIds.length === 0) {
+          showToast("请输入至少一个mscId", "error");
+          return;
+        }
+
+        // 清空结果区
+        sqlResults.innerHTML = "";
+
+        // 生成时间SQL
+        generateSqlGroup(
+          "SQL模板一结果",
+          timeSqlTemplate.value,
+          mscIds,
+          "time"
+        );
+
+        // 生成容器SQL
+        generateSqlGroup(
+          "SQL模板二结果",
+          containerSqlTemplate.value,
+          mscIds,
+          "container"
+        );
+
+        // 生成直播ID SQL
+        generateSqlGroup(
+          "SQL模板三结果",
+          liveIdSqlTemplate.value,
+          mscIds,
+          "liveId"
+        );
+
+        // 不再自动更新直播ID输入框
+
+        // 启用调用按钮
+        callApiBtn.classList.remove("opacity-50", "cursor-not-allowed");
+
+        showToast(`成功生成 ${mscIds.length} 组SQL语句`, "success");
+      });
+
+      // 生成SQL组
+      function generateSqlGroup(title, template, mscIds, type) {
+        const groupDiv = document.createElement("div");
+        groupDiv.className = "animate-fade-in";
+
+        let sqlContent = "";
+
+        if (type === "liveId" && mscIds.length > 1) {
+          // 对于直播ID SQL，如果有多个MSC ID，生成一个合并的SQL
+          const mscIdsStr = mscIds.map((id) => `'${id.trim()}'`).join(",");
+          sqlContent = template.replaceAll(
+            "${mscId}",
+            mscIdsStr.replace(/\$\{mscId\}/g, mscIds[0].trim())
+          );
+        } else {
+          // 其他情况，为每个MSC ID生成一个SQL
+          mscIds.forEach((mscId, index) => {
+            const sql = template.replaceAll(/\$\{mscId\}/g, mscId.trim());
+            sqlContent += sql;
+            if (index < mscIds.length - 1) {
+              sqlContent += "\n";
+            }
+          });
+        }
+
+        groupDiv.innerHTML = `
+                      <div class="sql-container">
+                          <div class="sql-header">
+                              <span>${title}</span>
+                              <button class="copy-btn" onclick="copySql(this)" data-type="${type}">
+                                  <i class="fa fa-copy"></i>
+                              </button>
+                          </div>
+                          <div class="sql-content">
+                              <pre><code class="language-sql" id="sql-${type}-${Date.now()}">${sqlContent}</code></pre>
+                          </div>
+                      </div>
+                  `;
+
+        sqlResults.appendChild(groupDiv);
+
+        // 简单显示SQL内容，不进行高亮
+        setTimeout(() => {
+          const codeBlock = groupDiv.querySelector("code");
+          if (codeBlock) {
+            hljs.highlightElement(codeBlock);
+          }
+        }, 100);
+      }
+
+      // 移除自动更新直播ID输入框的函数
+
+      // 复制SQL
+      window.copySql = function (button) {
+        const codeBlock = button
+          .closest(".sql-container")
+          .querySelector("code");
+        // 获取纯文本内容，去除HTML标签
+        const sqlText = codeBlock.textContent || codeBlock.innerText;
+
+        navigator.clipboard
+          .writeText(sqlText)
+          .then(() => {
+            const originalIcon = button.innerHTML;
+            button.innerHTML = '<i class="fa fa-check"></i>';
+            button.classList.add("copy-success");
+
+            setTimeout(() => {
+              button.innerHTML = originalIcon;
+              button.classList.remove("copy-success");
+            }, 2000);
+
+            showToast("SQL已复制到剪贴板", "success");
+          })
+          .catch(() => {
+            showToast("复制失败，请手动复制", "error");
+          });
+      };
+
+      // 监听多行直播ID输入变化
+      const liveIdsMultiInput = document.getElementById("liveIdsMulti");
+      const liveIdsSingleInput = document.getElementById("liveIdsSingle");
+
+      liveIdsMultiInput.addEventListener("input", () => {
+        const multiLineIds = liveIdsMultiInput.value;
+        const commaSeparatedIds = multiLineIds
+          .split("\n")
+          .map((id) => id.trim())
+          .filter((id) => id !== "")
+          .join(",");
+        liveIdsSingleInput.value = commaSeparatedIds;
+        updateLiveIdCount();
+        validateCounts();
+      });
+
+      mscIdsInput.addEventListener("input", () => {
+        updateMscCount();
+      });
+
+      // 更新MSC ID数量
+      function updateMscCount() {
+        const mscIds = mscIdsInput.value
+          .trim()
+          .split("\n")
+          .filter((id) => id.trim());
+        mscCountBadge.textContent = `${mscIds.length} 条`;
+        validateCounts();
+      }
+
+      // 更新直播ID数量
+      function updateLiveIdCount() {
+        const liveIds = liveIdsMultiInput.value
+          .trim()
+          .split("\n")
+          .filter((id) => id.trim());
+        liveIdCountBadge.textContent = `${liveIds.length} 条`;
+      }
+
+      // 校验MSC ID和直播ID数量是否相等
+      function validateCounts() {
+        const mscCount = mscIdsInput.value
+          .trim()
+          .split("\n")
+          .filter((id) => id.trim()).length;
+        const liveIdCount = liveIdsMultiInput.value
+          .trim()
+          .split("\n")
+          .filter((id) => id.trim()).length;
+
+        // 只有当两者都有值时才校验
+        if (mscCount > 0 && liveIdCount > 0 && mscCount !== liveIdCount) {
+          showToast(
+            `警告：mscId数量(${mscCount})与直播ID数量(${liveIdCount})不相等`,
+            "error"
+          );
+        }
+      }
+
+      // 调用接口
+      callApiBtn.addEventListener("click", async () => {
+        const liveIds = liveIdsSingleInput.value;
+        const secret = document.getElementById("secret").value;
+
+        if (!liveIds) {
+          showToast("请先生成直播ID", "error");
+          return;
+        }
+
+        // 显示加载状态
+        callApiBtn.disabled = true;
+        callApiBtn.innerHTML =
+          '<i class="fa fa-spinner fa-spin mr-2"></i> 调用中...';
+        apiResponse.innerHTML =
+          '<div class="flex items-center justify-center h-full"><i class="fa fa-spinner fa-spin mr-2"></i> 正在调用接口...</div>';
+
+        try {
+          // 模拟接口调用
+          const apiUrl = `${apiUrlInput.value}?liveIds=${liveIds}&secret=${secret}`;
+          const response = await fetch(apiUrl, {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+              "X-Request-With": "XMLHttpRequest",
+            },
+          });
+          const result = await response.json();
+          console.log("result : " + result + "---" + result["status"]);
+
+          if (result["status"] == 200 || result["code"] == 200) {
+            showToast("接口调用成功", "success");
+          } else {
+            showToast("接口调用失败", "error");
+          }
+
+          // 显示响应结果
+          apiResponse.innerHTML = `
+                          <pre class="text-green-400">${JSON.stringify(
+                            result,
+                            null,
+                            2
+                          )}</pre>
+                      `;
+        } catch (error) {
+          apiResponse.innerHTML = `
+                          <pre class="text-red-400">{
+        "code": 500,
+        "message": "接口调用失败: ${error.message}"
+      }</pre>
+                      `;
+          showToast("接口调用失败", "error");
+        } finally {
+          // 恢复按钮状态
+          callApiBtn.disabled = false;
+          callApiBtn.innerHTML =
+            '<i class="fa fa-play-circle mr-2"></i> 发起生成回放';
+        }
+      });
+
+      // 显示提示消息
+      function showToast(message, type = "info") {
+        const toast = document.createElement("div");
+        toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in flex items-center ${
+          type === "success"
+            ? "bg-success text-white"
+            : type === "error"
+            ? "bg-error text-white"
+            : "bg-primary text-white"
+        }`;
+
+        toast.innerHTML = `
+                      <i class="fa fa-${
+                        type === "success"
+                          ? "check-circle"
+                          : type === "error"
+                          ? "exclamation-circle"
+                          : "info-circle"
+                      } mr-2"></i>
+                      ${message}
+                  `;
+
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+          toast.style.opacity = "0";
+          toast.style.transform = "translateX(100%)";
+          toast.style.transition = "all 0.5s ease";
+
+          setTimeout(() => {
+            document.body.removeChild(toast);
+          }, 500);
+        }, 3000);
+      }
+
+      // 示例数据填充
+      mscIdsInput.value = "";
+    </script>
+  </body>
+</html>
